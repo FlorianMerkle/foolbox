@@ -22,7 +22,8 @@ from ..distances import l0, l1, l2, linf
 
 
 try:
-    from numba import jitclass  # type: ignore
+    from numba.experimental import jitclass  # type: ignore
+    import numba
 except (ModuleNotFoundError, ImportError) as e:  # pragma: no cover
     # delay the error until the attack is initialized
     NUMBA_IMPORT_ERROR = e
@@ -36,7 +37,6 @@ except (ModuleNotFoundError, ImportError) as e:  # pragma: no cover
 
 else:
     NUMBA_IMPORT_ERROR = None
-
 
 EPS = 1e-10
 
@@ -154,7 +154,7 @@ class Optimizer(object):  # pragma: no cover
         """
         N = x.shape[0]
 
-        lambda_lower = 2 * c / bnorm ** 2
+        lambda_lower = 2 * c / (bnorm ** 2 + EPS)
         lambda_upper = (
             np.sign(c) * np.inf
         )  # optimal initial point (if box-constraints are neglected)
@@ -320,7 +320,7 @@ class BrendelBethgeAttack(MinimizationAttack, ABC):
             decrease the step size in each iteration and ensure that the attack
             follows the boundary more faithfully.
         lr_decay : The trust region lr is multiplied with lr_decay in regular intervals (see
-            lr_reduction_interval).
+            lr_num_decay).
         lr_num_decay : Number of learning rate decays in regular intervals of
             length steps / lr_num_decay.
         momentum : Averaging of the boundary estimation over multiple steps. A momentum of
@@ -356,6 +356,11 @@ class BrendelBethgeAttack(MinimizationAttack, ABC):
         if NUMBA_IMPORT_ERROR is not None:
             raise NUMBA_IMPORT_ERROR  # pragma: no cover
 
+        if "0.49." in numba.__version__:
+            warnings.warn(
+                "There are known issues with numba version 0.49 and we suggest using numba 0.50 or newer."
+            )
+
         self.init_attack = init_attack
         self.overshoot = overshoot
         self.steps = steps
@@ -384,8 +389,6 @@ class BrendelBethgeAttack(MinimizationAttack, ABC):
         ----------
         inputs : Tensor that matches model type
             The original clean inputs.
-        labels : Integer tensor that matches model type
-            The reference labels for the inputs.
         criterion : Callable
             A callable that returns true if the given logits of perturbed
             inputs should be considered adversarial w.r.t. to the given labels
@@ -481,7 +484,7 @@ class BrendelBethgeAttack(MinimizationAttack, ABC):
 
         x = starting_points
         lrs = self.lr * np.ones(N)
-        lr_reduction_interval = min(1, int(self.steps / self.lr_num_decay))
+        lr_reduction_interval = max(1, int(self.steps / self.lr_num_decay))
         converged = np.zeros(N, dtype=np.bool)
         rate_normalization = np.prod(x.shape) * (max_ - min_)
         original_shape = x.shape
@@ -895,7 +898,7 @@ class BFGSB(object):
 
         return qk
 
-    def _cauchy_point(self, x, l, u, g, B):
+    def _cauchy_point(self, x, l, u, g, B):  # noqa: E741
         # finds the cauchy point for q(x)=x'Gx+x'd s$t. l<=x<=u
         # g=G*x+d #gradient of q(x)
         # converted from r-code: https://github.com/andrewhooker/PopED/blob/master/R/cauchy_point.R
@@ -905,9 +908,9 @@ class BFGSB(object):
 
         for i in range(n):
             if g[i] < 0:
-                t[i] = (x[i] - u[i]) / g[i]
+                t[i] = (x[i] - u[i]) / (g[i] - EPS)
             elif g[i] > 0:
-                t[i] = (x[i] - l[i]) / g[i]
+                t[i] = (x[i] - l[i]) / (g[i] + EPS)
             elif g[i] == 0:
                 t[i] = np.inf
 
@@ -949,7 +952,7 @@ class BFGSB(object):
 
         return x_cp
 
-    def _subspace_min(self, x, l, u, x_cp, d, G):
+    def _subspace_min(self, x, l, u, x_cp, d, G):  # noqa: E741
         # converted from r-code: https://github.com/andrewhooker/PopED/blob/master/R/subspace_min.R
         n = x.shape[0]
         Z = np.eye(n)
@@ -975,7 +978,7 @@ class BFGSB(object):
                     temp1 = 0
                 else:
                     if dk * alpha < temp2:
-                        temp1 = temp2 / dk
+                        temp1 = temp2 / (dk - EPS)
                     else:
                         temp2 = u[i] - x_cp[i]
             else:
@@ -984,13 +987,13 @@ class BFGSB(object):
                     temp1 = 0
                 else:
                     if dk * alpha > temp2:
-                        temp1 = temp2 / dk
+                        temp1 = temp2 / (dk + EPS)
 
             alpha = min(temp1, alpha)
 
         return x_cp + alpha * Z.dot(d[~fixed])
 
-    def _project(self, q, l, u):
+    def _project(self, q, l, u):  # noqa: E741
         N = q.shape[0]
         for k in range(N):
             if q[k] < l[k]:
@@ -1001,7 +1004,22 @@ class BFGSB(object):
         return q
 
     def _line_search_armijo(
-        self, fun_and_jac, pt, dpt, func_calls, m, gk, l, u, x0, x, b, min_, max_, c, r
+        self,
+        fun_and_jac,
+        pt,
+        dpt,
+        func_calls,
+        m,
+        gk,
+        l,  # noqa: E741
+        u,
+        x0,
+        x,
+        b,
+        min_,
+        max_,
+        c,
+        r,
     ):
         ls_rho = 0.6
         ls_c = 1e-4
@@ -1023,7 +1041,16 @@ class BFGSB(object):
         return ls_alpha, ls_pt, gkp1, dgkp1, func_calls
 
     def _line_search_wolfe(  # noqa: C901
-        self, fun_and_jac, xk, pk, gfk, old_fval, old_old_fval, l, u, args
+        self,
+        fun_and_jac,
+        xk,
+        pk,
+        gfk,
+        old_fval,
+        old_old_fval,
+        l,  # noqa: #E741
+        u,
+        args,
     ):
         """Find alpha that satisfies strong Wolfe conditions.
         Uses the line search algorithm to enforce strong Wolfe conditions
@@ -1566,7 +1593,7 @@ class L1Optimizer(Optimizer):
             for n in range(N):
                 dx = x0[n] - x[n]
                 bn = b[n]
-                t = 1 / (2 * mu)
+                t = 1 / (2 * mu + EPS)
                 u = -lam * bn * t - dx
 
                 if np.abs(u) - t < 0:
@@ -1620,7 +1647,7 @@ class L1Optimizer(Optimizer):
             for n in range(N):
                 dx = x0[n] - x[n]
                 bn = b[n]
-                t = 1 / (2 * mu)
+                t = 1 / (2 * mu + EPS)
                 u = -lam * bn * t - dx
 
                 if np.abs(u) - t < 0:
@@ -1667,7 +1694,7 @@ class L1Optimizer(Optimizer):
                 if np.abs(b[n]) > 0:
                     dx = x0[n] - x[n]
                     old_d = delta[n]
-                    new_d = old_d + dc / b[n]
+                    new_d = old_d + dc / (b[n] + np.sign(b[n]) * EPS)
 
                     if (
                         x[n] + new_d <= max_
@@ -1694,7 +1721,7 @@ class L1Optimizer(Optimizer):
                 idx = min_distance_idx
                 old_d = delta[idx]
 
-                new_d = old_d + dc / b[idx]
+                new_d = old_d + dc / (b[idx] + np.sign(b[idx]) * EPS)
                 delta[idx] = new_d
 
         return delta
@@ -1727,7 +1754,7 @@ class LinfOptimizer(Optimizer):
         func_calls = 0
 
         bnorm = np.linalg.norm(b)
-        lambda0 = 2 * c / bnorm ** 2
+        lambda0 = 2 * c / (bnorm ** 2 + EPS)
 
         k = 0
 
@@ -1865,7 +1892,7 @@ class LinfOptimizer(Optimizer):
                     # update is stepping out of feasible region, fallback to binary search
                     _lambda = (lambda_max - lambda_min) / 2 + lambda_min
                 else:
-                    _lambda += 2 * (c - _c) / _active_bnorm
+                    _lambda += 2 * (c - _c) / (_active_bnorm + EPS)
 
                 dlambda = lambda_max - lambda_min
                 if (
@@ -2285,7 +2312,7 @@ class L0Optimizer(Optimizer):
         g = -mu * r ** 2 - lam * c
 
         if mu > 0:
-            t = 1 / (2 * mu)
+            t = 1 / (2 * mu + EPS)
 
             for n in range(N):
                 dx = x0[n] - x[n]
@@ -2367,7 +2394,7 @@ class L0Optimizer(Optimizer):
             for n in range(N):
                 dx = x0[n] - x[n]
                 bn = b[n]
-                t = 1 / (2 * mu)
+                t = 1 / (2 * mu + EPS)
 
                 case1 = lam * bn * dx + mu * dx ** 2
 
@@ -2422,7 +2449,7 @@ class L0Optimizer(Optimizer):
                 if np.abs(b[n]) > 0:
                     dx = x0[n] - x[n]
                     old_d = delta[n]
-                    new_d = old_d + dc / b[n]
+                    new_d = old_d + dc / (b[n] + np.sign(b[n]) * EPS)
 
                     if (
                         x[n] + new_d <= max_
@@ -2459,7 +2486,7 @@ class L0Optimizer(Optimizer):
                 idx = min_distance_idx
                 old_d = delta[idx]
 
-                new_d = old_d + dc / b[idx]
+                new_d = old_d + dc / (b[idx] + np.sign(b[idx]) * EPS)
                 delta[idx] = new_d
 
                 return delta

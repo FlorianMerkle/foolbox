@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, Union
 import eagerpy as ep
 
 from ..criteria import Misclassification
@@ -45,7 +45,7 @@ class SaltAndPepperNoiseAttack(MinimizationAttack):
         self,
         model: Model,
         inputs: T,
-        criterion: Misclassification,
+        criterion: Union[Misclassification, Any],
         *,
         early_stop: Optional[float] = None,
         **kwargs: Any,
@@ -89,7 +89,7 @@ class SaltAndPepperNoiseAttack(MinimizationAttack):
             x = ep.clip(x, min_, max_)
 
             # check if we found new best adversarials
-            norms = flatten(x).norms.l2(axis=-1)
+            norms = flatten(x - x0).norms.l2(axis=-1)
             closer = norms < best_advs_norms
             is_adv = is_adversarial(x)  # TODO: ignore those that are not closer anyway
             is_best_adv = ep.logical_and(is_adv, closer)
