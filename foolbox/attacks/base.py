@@ -383,6 +383,7 @@ class MinimizationAttack(AttackWithDistance):
         inputs: T,
         criterion: Any,
         *,
+        eps_early_stop: Optional[bool] = False,
         epsilons: Union[Sequence[Union[float, None]], float, None],
         **kwargs: Any,
     ) -> Union[Tuple[List[T], List[T], T], Tuple[T, T, T]]:
@@ -405,9 +406,8 @@ class MinimizationAttack(AttackWithDistance):
             early_stop = None
         else:
             early_stop = min(epsilons)
-
         # run the actual attack
-        xp = self.run(model, x, criterion, early_stop=early_stop, **kwargs)
+        xp = self.run(model, x, criterion, eps_early_stop=eps_early_stop, epsilons=epsilons, early_stop=early_stop, **kwargs)
 
         xpcs = []
         success = []

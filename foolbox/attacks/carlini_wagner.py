@@ -51,14 +51,14 @@ class L2CarliniWagnerAttack(MinimizationAttack):
         confidence: float = 0,
         initial_const: float = 1e-3,
         abort_early: bool = True,
-    ):
+):
         self.binary_search_steps = binary_search_steps
         self.steps = steps
         self.stepsize = stepsize
         self.confidence = confidence
         self.initial_const = initial_const
         self.abort_early = abort_early
-
+        
     def run(
         self,
         model: Model,
@@ -66,6 +66,8 @@ class L2CarliniWagnerAttack(MinimizationAttack):
         criterion: Union[Misclassification, TargetedMisclassification, T],
         *,
         early_stop: Optional[float] = None,
+        epsilons: float,
+        eps_early_stop: Optional[bool] = False,
         **kwargs: Any,
     ) -> T:
         raise_if_kwargs(kwargs)
@@ -74,6 +76,8 @@ class L2CarliniWagnerAttack(MinimizationAttack):
         del inputs, criterion, kwargs
 
         N = len(x)
+        if eps_early_stop and len(epsilons)!=1: print('epsilon-based early stopping only possible for one epsilon value')
+        assert not(eps_early_stop and len(epsilons)!=1)
 
         if isinstance(criterion_, Misclassification):
             targeted = False
@@ -138,6 +142,7 @@ class L2CarliniWagnerAttack(MinimizationAttack):
         consts = self.initial_const * np.ones((N,))
         lower_bounds = np.zeros((N,))
         upper_bounds = np.inf * np.ones((N,))
+        epsilon = ep.astensor(epsilons[0] * ep.ones(x,(N,)))
 
         best_advs = ep.zeros_like(x)
         best_advs_norms = ep.full(x, (N,), ep.inf)
@@ -181,7 +186,12 @@ class L2CarliniWagnerAttack(MinimizationAttack):
                 new_best_ = atleast_kd(new_best, best_advs.ndim)
                 best_advs = ep.where(new_best_, perturbed, best_advs)
                 best_advs_norms = ep.where(new_best, norms, best_advs_norms)
+                if eps_early_stop and (ep.maximum(best_advs_norms,epsilon) == epsilon).all():
+                    break
 
+            if eps_early_stop and (ep.maximum(best_advs_norms,epsilon) == epsilon).all():
+                print('early stopped because epsilon condition satisfied')
+                break
             upper_bounds = np.where(found_advs, consts, upper_bounds)
             lower_bounds = np.where(found_advs, lower_bounds, consts)
 
