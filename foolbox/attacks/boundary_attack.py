@@ -74,6 +74,7 @@ class BoundaryAttack(MinimizationAttack):
         step_adaptation: float = 1.5,
         tensorboard: Union[Literal[False], None, str] = False,
         update_stats_every_k: int = 10,
+        eps_early_stop: bool = False,
     ):
         if init_attack is not None and not isinstance(init_attack, MinimizationAttack):
             raise NotImplementedError
@@ -85,6 +86,7 @@ class BoundaryAttack(MinimizationAttack):
         self.step_adaptation = step_adaptation
         self.tensorboard = tensorboard
         self.update_stats_every_k = update_stats_every_k
+        self.eps_early_stop = eps_early_stop
 
     def run(
         self,
@@ -94,6 +96,7 @@ class BoundaryAttack(MinimizationAttack):
         *,
         early_stop: Optional[float] = None,
         starting_points: Optional[T] = None,
+        epsilons: float,
         **kwargs: Any,
     ) -> T:
         raise_if_kwargs(kwargs)
@@ -137,6 +140,7 @@ class BoundaryAttack(MinimizationAttack):
         tb = TensorBoard(logdir=self.tensorboard)
 
         N = len(originals)
+        epsilon = ep.astensor(epsilons[0] * ep.ones(originals,(N,)))
         ndim = originals.ndim
         spherical_steps = ep.ones(originals, N) * self.spherical_step
         source_steps = ep.ones(originals, N) * self.source_step
@@ -275,6 +279,10 @@ class BoundaryAttack(MinimizationAttack):
 
             tb.histogram("spherical_step", spherical_steps, step)
             tb.histogram("source_step", source_steps, step)
+            best_advs_norms = flatten(originals - best_advs).norms.l2(axis=-1)
+            if self.eps_early_stop and (ep.maximum(best_advs_norms,epsilon) == epsilon).all():
+                print('early stopped because epsilon condition satisfied')
+                break
         tb.close()
         return restore_type(best_advs)
 
