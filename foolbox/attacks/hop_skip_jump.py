@@ -69,6 +69,7 @@ class HopSkipJump(MinimizationAttack):
         gamma: float = 1.0,
         tensorboard: Union[Literal[False], None, str] = False,
         constraint: Union[Literal["linf"], Literal["l2"]] = "l2",
+        eps_early_stop: bool = False,
     ):
         if init_attack is not None and not isinstance(init_attack, MinimizationAttack):
             raise NotImplementedError
@@ -80,6 +81,7 @@ class HopSkipJump(MinimizationAttack):
         self.gamma = gamma
         self.tensorboard = tensorboard
         self.constraint = constraint
+        self.eps_early_stop = eps_early_stop
 
         assert constraint in ("l2", "linf")
         if constraint == "l2":
@@ -95,12 +97,19 @@ class HopSkipJump(MinimizationAttack):
         *,
         early_stop: Optional[float] = None,
         starting_points: Optional[T] = None,
+        epsilons: float,
         **kwargs: Any,
     ) -> T:
         raise_if_kwargs(kwargs)
         originals, restore_type = ep.astensor_(inputs)
         del inputs, kwargs
-
+        
+        N = len(originals)
+        if self.eps_early_stop and len(epsilons)!=1: print('epsilon-based early stopping only possible for one epsilon value')
+        assert not(self.eps_early_stop and len(epsilons)!=1)
+        
+        epsilon = ep.astensor(epsilons[0] * ep.ones(originals,(N,)))
+        del epsilons
         criterion = get_criterion(criterion)
         is_adversarial = get_is_adversarial(criterion, model)
 
@@ -225,9 +234,11 @@ class HopSkipJump(MinimizationAttack):
                 x_advs = proposals[minimal_idx]
 
             distances = self.distance(originals, x_advs)
-
             # log stats
             tb.histogram("norms", distances, step)
+            if self.eps_early_stop and (ep.maximum(distances,epsilon) == epsilon).all():
+                print('early stopped because epsilon condition satisfied')
+                break
 
         return restore_type(x_advs)
 
