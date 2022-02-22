@@ -102,7 +102,10 @@ class BoundaryAttack(MinimizationAttack):
         raise_if_kwargs(kwargs)
         originals, restore_type = ep.astensor_(inputs)
         del inputs, kwargs
-
+        
+        if self.eps_early_stop and len(epsilons)!=1: print('epsilon-based early stopping only possible for one epsilon value')
+        assert not(self.eps_early_stop and len(epsilons)!=1)
+        
         criterion = get_criterion(criterion)
         is_adversarial = get_is_adversarial(criterion, model)
 
