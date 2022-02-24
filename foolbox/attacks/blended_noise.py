@@ -50,7 +50,7 @@ class LinearSearchBlendedUniformNoiseAttack(FlexibleDistanceMinimizationAttack):
         early_stop: Optional[float] = None,
         **kwargs: Any,
     ) -> T:
-        raise_if_kwargs(kwargs)
+        #raise_if_kwargs(kwargs)
         x, restore_type = ep.astensor_(inputs)
         criterion_ = get_criterion(criterion)
         del inputs, criterion, kwargs
