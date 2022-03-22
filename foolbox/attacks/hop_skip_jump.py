@@ -24,7 +24,7 @@ from .base import raise_if_kwargs
 from ..distances import l2, linf
 
 
-class HopSkipJump(MinimizationAttack):
+class HopSkipJumpAttack(MinimizationAttack):
     """A powerful adversarial attack that requires neither gradients
     nor probabilities [#Chen19].
 
