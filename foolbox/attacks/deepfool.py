@@ -101,7 +101,7 @@ class DeepFoolAttack(MinimizationAttack, ABC):
         early_stop: Optional[float] = None,
         **kwargs: Any,
     ) -> T:
-        raise_if_kwargs(kwargs)
+        #raise_if_kwargs(kwargs)
         x, restore_type = ep.astensor_(inputs)
         del inputs, kwargs
 
