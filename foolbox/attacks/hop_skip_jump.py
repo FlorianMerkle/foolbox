@@ -24,7 +24,7 @@ from .base import raise_if_kwargs
 from ..distances import l2, linf
 
 
-class HopSkipJumpAttack(MinimizationAttack):
+class HopSkipJump(MinimizationAttack):
     """A powerful adversarial attack that requires neither gradients
     nor probabilities [#Chen19].
 
@@ -262,11 +262,7 @@ class HopSkipJumpAttack(MinimizationAttack):
         perturbed = ep.expand_dims(x_advs, 0) + scaled_rv
         perturbed = ep.clip(perturbed, 0, 1)
 
-<<<<<<< HEAD
-        rv = (perturbed - x_advs) / atleast_kd(ep.expand_dims(delta+1e-12, 0), rv.ndim)
-=======
-        rv = (perturbed - x_advs) / atleast_kd(ep.expand_dims(delta + 1e-8, 0), rv.ndim)
->>>>>>> b7f7ee6fa3d5888b0bef411712cff480f6370e2f
+        rv = (perturbed - x_advs) / atleast_kd(ep.expand_dims(delta+1e-7, 0), rv.ndim)
 
         multipliers_list: List[ep.Tensor] = []
         for step in range(steps):
