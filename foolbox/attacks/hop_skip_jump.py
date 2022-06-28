@@ -21,6 +21,7 @@ from .base import MinimizationAttack, get_is_adversarial
 from .base import get_criterion
 from .base import T
 from .base import raise_if_kwargs
+from .base import verify_input_bounds
 from ..distances import l2, linf
 
 
@@ -110,6 +111,9 @@ class HopSkipJumpAttack(MinimizationAttack):
         
         epsilon = ep.astensor(epsilons[0] * ep.ones(originals,(N,)))
         del epsilons
+
+        verify_input_bounds(originals, model)
+
         criterion = get_criterion(criterion)
         is_adversarial = get_is_adversarial(criterion, model)
 
@@ -270,8 +274,22 @@ class HopSkipJumpAttack(MinimizationAttack):
             multipliers_list.append(
                 ep.where(
                     decision,
-                    ep.ones(x_advs, (len(x_advs,))),
-                    -ep.ones(x_advs, (len(decision,))),
+                    ep.ones(
+                        x_advs,
+                        (
+                            len(
+                                x_advs,
+                            )
+                        ),
+                    ),
+                    -ep.ones(
+                        x_advs,
+                        (
+                            len(
+                                decision,
+                            )
+                        ),
+                    ),
                 )
             )
         # (steps, bs, ...)

@@ -19,6 +19,7 @@ from .base import MinimizationAttack
 from .base import T
 from .base import get_criterion
 from .base import raise_if_kwargs
+from .base import verify_input_bounds
 
 from .gradient_descent_base import AdamOptimizer
 
@@ -77,6 +78,8 @@ class L2CarliniWagnerAttack(MinimizationAttack):
         x, restore_type = ep.astensor_(inputs)
         criterion_ = get_criterion(criterion)
         del inputs, criterion, kwargs
+
+        verify_input_bounds(x, model)
 
         N = len(x)
         if self.eps_early_stop and len(epsilons)!=1: print('epsilon-based early stopping only possible for one epsilon value')

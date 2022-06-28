@@ -15,7 +15,8 @@ attacks = [
 
 @pytest.mark.parametrize("attack", attacks)
 def test_call_one_epsilon(
-    fmodel_and_data_ext_for_attacks: ModeAndDataAndDescription, attack: fbn.Attack,
+    fmodel_and_data_ext_for_attacks: ModeAndDataAndDescription,
+    attack: fbn.Attack,
 ) -> None:
     (fmodel, x, y), _, _ = fmodel_and_data_ext_for_attacks
 
@@ -43,3 +44,15 @@ def test_get_channel_axis() -> None:
     model.data_format = "invalid"  # type: ignore
     with pytest.raises(ValueError):
         assert fbn.attacks.base.get_channel_axis(model, 3)  # type: ignore
+
+
+def test_model_bounds(
+    fmodel_and_data_ext_for_attacks: ModeAndDataAndDescription,
+) -> None:
+    (fmodel, x, y), _, _ = fmodel_and_data_ext_for_attacks
+    attack = fbn.attacks.InversionAttack()
+
+    with pytest.raises(AssertionError):
+        attack.run(fmodel, x * 0.0 - fmodel.bounds.lower - 0.1, y)
+    with pytest.raises(AssertionError):
+        attack.run(fmodel, x * 0.0 + fmodel.bounds.upper + 0.1, y)
