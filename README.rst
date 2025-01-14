@@ -1,3 +1,20 @@
+===============================================================================================================================
+Game Over Eva(sion) Foolbox Fork
+===============================================================================================================================
+
+===============================================================================================================================
+
+For our Paper `On the Economics of Adversarial Machine Learning <https://ieeexplore.ieee.org/document/10476499>`_ we had to customize the official Foolbox library.
+
+The changes include:
+
+- adding [constants](www.google.de) to enhance numerical stability
+- implement $\epsilon$ - based early stopping for the Carlini&Wagner $L_2$ attack
+- implement $\epsilon$ - based early stopping for the Boundary attack
+
+===============================================================================================================================
+
+
 .. raw:: html
 
    <a href="https://foolbox.jonasrauber.de"><img src="https://raw.githubusercontent.com/bethgelab/foolbox/master/guide/.vuepress/public/logo_small.png" align="right" /></a>
